@@ -32,19 +32,17 @@
 #include <stdlib.h> /* malloc() */
 #include <string.h> /* strncpy() */
 #include <strings.h> /* strncasecmp() */
-#include <ctype.h> /* isblank() */
+#include <ctype.h> /* isblank(), isdigit() */
 
 #include "http.h"
 #include "protocol.h"
-
-#define SERVER_NAME_LEN 256
 
 static int parse_http_header(const char *, size_t, char **);
 static int get_header(const char *, const char *, int, char **);
 static int next_header(const char **, int *);
 
 static const protocol_t http_protocol_st = {
-    .default_port =                 80,
+    .default_port = 80,
     .parse_packet = &parse_http_header,
 };
 const protocol_t *const http_protocol = &http_protocol_st;
@@ -80,12 +78,15 @@ parse_http_header(const char *data, size_t data_len, char **hostname)
     /*
      *  if the user specifies the port in the request, it is included here.
      *  Host: example.com:80
+     *  Host: [2001:db8::1]:8080
      *  so we trim off port portion
      */
     for (i = result - 1; i >= 0; i--)
         if ((*hostname)[i] == ':') {
             (*hostname)[i] = '\0';
             result         = i;
+            break;
+        } else if (!isdigit((*hostname)[i])) {
             break;
         }
 
@@ -103,7 +104,7 @@ get_header(const char *header, const char *data, int data_len, char **value)
     while ((len = next_header(&data, &data_len)) != 0)
         if (len > header_len && strncasecmp(header, data, header_len) == 0) {
             /* Eat leading whitespace */
-            while (header_len < len && isblank(data[header_len]))
+            while (header_len < len && isblank((unsigned char)data[header_len]))
                 header_len++;
 
             *value = malloc(len - header_len + 1);
