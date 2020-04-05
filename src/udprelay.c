@@ -521,7 +521,7 @@ create_server_socket(const char *host, const char *port)
             exit(EXIT_FAILURE);
         }
 
-        if (setsockopt(server_sock, SOL_IP, flag_r, &opt, sizeof(opt))) {
+        if (setsockopt(server_sock, sol, flag_r, &opt, sizeof(opt))) {
             FATAL("[udp] setsockopt IP_RECVORIGDSTADDR");
         }
 #endif
@@ -880,7 +880,7 @@ remote_recv_cb(EV_P_ ev_io *w, int revents)
 
     int s = sendto(src_fd, buf->data, buf->len, 0,
                    (struct sockaddr *)&remote_ctx->src_addr, remote_src_addr_len);
-    if (s == -1) {
+    if (s == -1 && !(errno == EAGAIN || errno == EWOULDBLOCK)) {
         ERROR("[udp] remote_recv_sendto");
         close(src_fd);
         goto CLEAN_UP;
@@ -891,7 +891,7 @@ remote_recv_cb(EV_P_ ev_io *w, int revents)
 
     int s = sendto(server_ctx->fd, buf->data, buf->len, 0,
                    (struct sockaddr *)&remote_ctx->src_addr, remote_src_addr_len);
-    if (s == -1) {
+    if (s == -1 && !(errno == EAGAIN || errno == EWOULDBLOCK)) {
         ERROR("[udp] remote_recv_sendto");
         goto CLEAN_UP;
     }
@@ -1347,12 +1347,6 @@ server_recv_cb(EV_P_ ev_io *w, int revents)
             }
         }
     } else {
-        struct addrinfo hints;
-        memset(&hints, 0, sizeof(struct addrinfo));
-        hints.ai_family   = AF_UNSPEC;
-        hints.ai_socktype = SOCK_DGRAM;
-        hints.ai_protocol = IPPROTO_UDP;
-
         struct query_ctx *query_ctx = new_query_ctx(buf->data + addr_header_len,
                                                     buf->len - addr_header_len);
         query_ctx->server_ctx      = server_ctx;
